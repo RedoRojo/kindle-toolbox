@@ -1,0 +1,10 @@
+{
+  "id": "kindle-toolbox",
+  "name": "Kindle Toolbox",
+  "description": "Conversor de artículos web a EPUB optimizado para pantallas E-Ink y Kindle.",
+  "category": "Lectura",
+  "icon": "book-open",
+  "command": "./run.sh",
+  "port": 8004,
+  "health_path": "/"
+}

@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Datos de usuario y salidas generadas
+uploads/
+output/
+*.pdf
+*.epub
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
