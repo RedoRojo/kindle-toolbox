@@ -1,32 +1,32 @@
 # Kindle Toolbox 📖
 
-Conversor local de artículos web y documentos PDF a libros electrónicos **EPUB3 reflowable**, diseñado específicamente para una lectura cómoda en pantallas de tinta electrónica (E-Ink) y lectores Kindle.
+Local web converter for transforming web articles and PDF documents into **reflowable EPUB3** e-books, specifically tailored for comfortable reading on E-Ink displays and Kindle e-readers.
 
-## ✨ Características Principales
+## ✨ Key Features
 
-- **Web a EPUB (Artículo Individual o Libro Multicapítulo)**:
-  - Extrae el contenido limpio de artículos, ensayos o múltiples enlaces web eliminando anuncios, menús y elementos distractores.
-  - Descarga, optimiza e incrusta las imágenes del artículo como activos locales dentro del paquete EPUB.
-- **PDF a EPUB Inteligente**:
-  - Reconstruye el flujo de texto desde documentos PDF complejos (incluyendo maquetación en múltiples columnas).
-  - Desguionado automático de palabras cortadas al final de línea y saneamiento de artefactos de codificación.
-  - Detección automática de estructura de capítulos y limpieza de encabezados/pies de página repetitivos.
-  - Extracción y vinculación de notas al pie.
-- **Acabado Editorial E-Ink**:
-  - Generación automática de portada de alta resolución con título y autor.
-  - Hojas de estilo tipográficas optimizadas para tinta electrónica y navegación dual (`NCX` y `EPUB3 Nav`).
+- **Web to EPUB (Single Article or Multi-Chapter Book)**:
+  - Extracts clean content from articles, essays, or multiple web links while stripping ads, navigation menus, and visual clutter.
+  - Downloads, optimizes, and embeds article images as local assets inside the EPUB package.
+- **Smart PDF to EPUB Conversion**:
+  - Reconstructs clean flowing text from complex PDF documents (including multi-column layouts).
+  - Automatic de-hyphenation of line-broken words and sanitization of encoding artifacts.
+  - Automatic chapter structure detection and removal of repetitive headers and footers.
+  - Extraction and hyperlinking of footnotes.
+- **E-Ink Editorial Finish**:
+  - Automatic high-resolution cover generation featuring title and author.
+  - E-Ink optimized typographic stylesheets and dual navigation (`NCX` and `EPUB3 Nav`).
 
-## 🚀 Ejecución Rápida
+## 🚀 Quick Start
 
 ```bash
 ./run.sh
 ```
 
-Por defecto, el servidor web se iniciará en **[http://127.0.0.1:8004](http://127.0.0.1:8004)** (o puedes abrirlo directamente desde **Tools Hub**).
+By default, the web server starts at **[http://127.0.0.1:8004](http://127.0.0.1:8004)** (or can be launched directly from **Tools Hub**).
 
-## 📦 Instalación de Dependencias
+## 📦 Installing Dependencies
 
-Si utilizas un entorno virtual estándar o Conda:
+Using a standard virtual environment or Conda:
 
 ```bash
 pip install -r requirements.txt

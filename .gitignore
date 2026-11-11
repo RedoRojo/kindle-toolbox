@@ -6,7 +6,7 @@ __pycache__/
 venv/
 env/
 
-# Datos de usuario y salidas generadas
+# User uploads and generated EPUB outputs
 uploads/
 output/
 *.pdf
