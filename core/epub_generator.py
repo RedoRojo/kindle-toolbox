@@ -11,7 +11,7 @@ import re
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 
 from ebooklib import epub
 from PIL import Image, ImageDraw, ImageFont
@@ -691,6 +691,7 @@ def create_epub_book(
     article_data: Dict[str, Any],
     paragraph_style: str = "book",
     generate_cover: bool = True,
+    output_path: Optional[Union[str, Path]] = None,
 ) -> Dict[str, Any]:
     """
     Creates a single-article EPUB3 file with complete metadata, E-Ink CSS,
@@ -779,15 +780,20 @@ def create_epub_book(
     # Reading spine
     book.spine = ["nav", chapter]
 
-    out_filename = clean_filename(title, author)
-    out_path = OUTPUT_DIR / out_filename
-
-    counter = 2
-    base_stem = out_path.stem
-    while out_path.exists():
-        out_filename = f"{base_stem} ({counter}).epub"
+    if output_path is not None:
+        out_path = Path(output_path)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_filename = out_path.name
+    else:
+        out_filename = clean_filename(title, author)
         out_path = OUTPUT_DIR / out_filename
-        counter += 1
+
+        counter = 2
+        base_stem = out_path.stem
+        while out_path.exists():
+            out_filename = f"{base_stem} ({counter}).epub"
+            out_path = OUTPUT_DIR / out_filename
+            counter += 1
 
     epub.write_epub(str(out_path), book, {})
     filesize = out_path.stat().st_size
@@ -806,6 +812,7 @@ def create_multi_chapter_epub(
     chapters: List[Dict[str, Any]],
     paragraph_style: str = "book",
     generate_cover: bool = True,
+    output_path: Optional[Union[str, Path]] = None,
 ) -> Dict[str, Any]:
     """
     Creates a multi-chapter reflowable EPUB3 book from structured PDF content.
@@ -1004,15 +1011,20 @@ def create_multi_chapter_epub(
 
     book.spine = ["nav"] + front_matter_spine + epub_chapters
 
-    out_filename = clean_filename(title, author)
-    out_path = OUTPUT_DIR / out_filename
-
-    counter = 2
-    base_stem = out_path.stem
-    while out_path.exists():
-        out_filename = f"{base_stem} ({counter}).epub"
+    if output_path is not None:
+        out_path = Path(output_path)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_filename = out_path.name
+    else:
+        out_filename = clean_filename(title, author)
         out_path = OUTPUT_DIR / out_filename
-        counter += 1
+
+        counter = 2
+        base_stem = out_path.stem
+        while out_path.exists():
+            out_filename = f"{base_stem} ({counter}).epub"
+            out_path = OUTPUT_DIR / out_filename
+            counter += 1
 
     epub.write_epub(str(out_path), book, {})
     filesize = out_path.stat().st_size
@@ -1025,3 +1037,90 @@ def create_multi_chapter_epub(
         "author": author,
         "chapters_count": len(chapters),
     }
+
+
+def build_epub_from_url(
+    url: str,
+    title: Optional[str] = None,
+    author: Optional[str] = None,
+    date: Optional[str] = None,
+    sitename: Optional[str] = None,
+    include_images: bool = True,
+    paragraph_style: str = "book",
+    generate_cover: bool = True,
+    output_path: Optional[Union[str, Path]] = None,
+) -> Dict[str, Any]:
+    """Extracts a web article and compiles it into a single-article EPUB3 book."""
+    from .scraper import extract_clean_article
+
+    article_data = extract_clean_article(url, include_images=include_images)
+    if title and title.strip():
+        article_data["title"] = title.strip()
+    if author and author.strip():
+        article_data["author"] = author.strip()
+    if date and date.strip():
+        article_data["date"] = date.strip()
+    if sitename and sitename.strip():
+        article_data["sitename"] = sitename.strip()
+
+    style = paragraph_style if paragraph_style in ("book", "article") else "book"
+    return create_epub_book(
+        article_data=article_data,
+        paragraph_style=style,
+        generate_cover=bool(generate_cover),
+        output_path=output_path,
+    )
+
+
+def analyze_pdf(pdf_path: str, col_mode: str = "auto") -> Dict[str, Any]:
+    """Analyzes a PDF and returns metadata plus a chapter summary without writing an EPUB."""
+    from .pdf_to_epub import extract_structured_pdf
+
+    structured = extract_structured_pdf(str(pdf_path), col_mode=col_mode)
+    chapters_summary = [
+        {
+            "id": c["id"],
+            "title": c["title"],
+            "footnotes_count": c["footnotes_count"],
+        }
+        for c in structured["chapters"]
+    ]
+    return {
+        "title": structured["title"],
+        "author": structured["author"],
+        "language": structured.get("language", "en"),
+        "total_pages": structured["total_pages"],
+        "detected_col_mode": structured["detected_col_mode"],
+        "dominant_cols": structured["dominant_cols"],
+        "chapters_count": structured["chapters_count"],
+        "total_footnotes": structured["total_footnotes"],
+        "chapters": chapters_summary,
+    }
+
+
+def build_epub_from_pdf(
+    pdf_path: str,
+    col_mode: str = "auto",
+    title: Optional[str] = None,
+    author: Optional[str] = None,
+    paragraph_style: str = "book",
+    generate_cover: bool = True,
+    output_path: Optional[Union[str, Path]] = None,
+) -> Dict[str, Any]:
+    """Analyzes a PDF document and compiles it into a multi-chapter reflowable EPUB3 book."""
+    from .pdf_to_epub import extract_structured_pdf
+
+    pdf_data = extract_structured_pdf(str(pdf_path), col_mode=col_mode)
+    if title and title.strip():
+        pdf_data["title"] = title.strip()
+    if author and author.strip():
+        pdf_data["author"] = author.strip()
+
+    style = paragraph_style if paragraph_style in ("book", "article") else "book"
+    return create_multi_chapter_epub(
+        book_data=pdf_data,
+        chapters=pdf_data["chapters"],
+        paragraph_style=style,
+        generate_cover=bool(generate_cover),
+        output_path=output_path,
+    )
