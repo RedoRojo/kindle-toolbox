@@ -1,4 +1,4 @@
-/* Kindle Toolbox - Estilos Minimalistas Sobrios (Slate / Zinc) */
+/* Kindle Toolbox - Minimalist Slate & Zinc E-Ink Theme */
 
 :root {
   --bg: #090a0f;
@@ -6,7 +6,7 @@
   --surface-hover: #181b22;
   --border: #232730;
   --border-focus: #3b4252;
-  
+
   --text-main: #f1f5f9;
   --text-muted: #94a3b8;
   --text-dim: #64748b;
@@ -37,6 +37,27 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.visually-hidden {
+  position: absolute;
+  clip-path: inset(50%);
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  white-space: nowrap;
+}
+
+:focus-visible {
+  outline: 2px solid #94a3b8;
+  outline-offset: 2px;
 }
 
 body {
@@ -156,7 +177,7 @@ body {
   margin-bottom: 1.5rem;
 }
 
-/* Formulario */
+/* Forms & Inputs */
 .input-group {
   display: flex;
   gap: 0.75rem;
@@ -183,15 +204,19 @@ body {
   border-radius: var(--radius-md);
   padding: 0.75rem 1rem 0.75rem 2.6rem;
   color: var(--text-main);
-  font-size: 0.92rem;
+  font-size: max(1rem, 0.92rem);
   font-family: inherit;
+  min-height: 44px;
   transition: border-color 0.2s ease;
 }
 
 .url-input-wrapper input:focus {
-  outline: none;
   border-color: #64748b;
   box-shadow: 0 0 0 1px #64748b;
+}
+
+.url-input-wrapper input:focus:not(:focus-visible) {
+  outline: none;
 }
 
 .extract-options {
@@ -218,13 +243,14 @@ body {
   cursor: pointer;
 }
 
-/* Botones */
+/* Buttons */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
   padding: 0.75rem 1.4rem;
+  min-height: 44px;
   border-radius: var(--radius-md);
   font-size: 0.9rem;
   font-weight: 500;
@@ -232,6 +258,7 @@ body {
   border: 1px solid transparent;
   transition: all 0.2s ease;
   white-space: nowrap;
+  text-decoration: none;
 }
 
 .btn-primary {
@@ -270,7 +297,7 @@ body {
   cursor: not-allowed;
 }
 
-/* Spinner */
+/* Loading Spinner */
 .spinner {
   width: 16px;
   height: 16px;
@@ -284,12 +311,15 @@ body {
   to { transform: rotate(360deg); }
 }
 
-/* Mensajes de estado */
+/* Status Messages */
 .status-box {
   margin-top: 1rem;
   padding: 0.8rem 1rem;
   border-radius: var(--radius-md);
   font-size: 0.85rem;
+  background-color: #161b26;
+  border: 1px solid var(--border);
+  color: var(--text-main);
 }
 
 .status-box.error {
@@ -298,7 +328,7 @@ body {
   color: var(--danger-text);
 }
 
-/* Sección de Preview y Edición */
+/* Preview & Metadata Editor Section */
 .preview-header {
   display: flex;
   justify-content: space-between;
@@ -306,6 +336,8 @@ body {
   margin-bottom: 1.4rem;
   padding-bottom: 0.8rem;
   border-bottom: 1px solid var(--border);
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .preview-header h2 {
@@ -352,23 +384,28 @@ body {
   border-radius: var(--radius-sm);
   padding: 0.65rem 0.85rem;
   color: var(--text-main);
-  font-size: 0.9rem;
+  font-size: max(1rem, 0.9rem);
   font-family: inherit;
+  min-height: 44px;
   transition: border-color 0.2s;
 }
 
 .form-input:focus {
-  outline: none;
   border-color: #64748b;
 }
 
-/* Opciones E-Ink */
+.form-input:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* E-Ink Options Fieldset */
 .options-box {
   background-color: #0c0e12;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 1.2rem;
   margin-bottom: 1.5rem;
+  min-inline-size: 0;
 }
 
 .options-title {
@@ -377,7 +414,7 @@ body {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  margin-bottom: 0.9rem;
+  padding: 0 0.45rem;
 }
 
 .options-row {
@@ -426,7 +463,7 @@ body {
   line-height: 1.35;
 }
 
-/* Acordeón de Vista Previa */
+/* Preview Accordion */
 .preview-accordion {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -462,11 +499,11 @@ body {
   justify-content: center;
 }
 
-/* Simulación de pantalla E-Ink */
+/* E-Ink Paper Simulation */
 .eink-screen {
   max-width: 650px;
   width: 100%;
-  background-color: #f7f6f2; /* Tono cálido de papel e-ink */
+  background-color: #f7f6f2;
   color: #111111;
   padding: 2.2rem 2rem;
   border-radius: 4px;
@@ -496,13 +533,13 @@ body {
   margin: 1.2em auto;
 }
 
-/* Barra de acciones */
+/* Action Bar */
 .actions-bar {
   display: flex;
   justify-content: flex-end;
 }
 
-/* Resultado de descarga */
+/* Download Banner */
 .download-result {
   margin-top: 1.5rem;
   padding: 1.1rem 1.4rem;
@@ -546,7 +583,7 @@ body {
   display: none !important;
 }
 
-/* Pestañas (Tabs) */
+/* Tabs */
 .tabs-container {
   display: flex;
   gap: 0.5rem;
@@ -564,6 +601,7 @@ body {
   justify-content: center;
   gap: 0.5rem;
   padding: 0.65rem 1rem;
+  min-height: 44px;
   background: transparent;
   border: none;
   border-radius: var(--radius-sm);
@@ -596,7 +634,7 @@ body {
   display: flex;
 }
 
-/* Selector de fuentes PDF */
+/* PDF Source Selection */
 .pdf-source-box {
   background-color: #0c0e12;
   border: 1px solid var(--border);
@@ -611,6 +649,11 @@ body {
 .select-with-btn {
   display: flex;
   gap: 0.5rem;
+}
+
+.select-with-btn select {
+  flex: 1;
+  min-width: 0;
 }
 
 .btn-sm {
@@ -638,14 +681,14 @@ body {
   align-items: flex-end;
 }
 
-/* Badges row */
+/* Badges Row */
 .badges-row {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
 }
 
-/* Lista de capítulos */
+/* Chapter List */
 .chapters-box {
   background-color: #0c0e12;
   border: 1px solid var(--border);
@@ -661,6 +704,8 @@ body {
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--border);
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .chapters-header h3 {
@@ -699,6 +744,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0.75rem;
   margin-bottom: 0.35rem;
 }
 
@@ -711,6 +757,7 @@ body {
 .chapter-item-meta {
   font-size: 0.72rem;
   color: var(--text-dim);
+  white-space: nowrap;
 }
 
 .chapter-item-preview {
@@ -722,7 +769,7 @@ body {
   text-overflow: ellipsis;
 }
 
-/* Responsividad */
+/* Responsive Breakpoints */
 @media (max-width: 650px) {
   .metadata-grid, .options-row, .pdf-options-row {
     grid-template-columns: 1fr;
@@ -740,4 +787,3 @@ body {
     width: 100%;
   }
 }
-

@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kindle Toolbox | Artículos Web y PDFs a EPUB E-Ink</title>
+  <title>Kindle Toolbox | Web Articles &amp; PDFs to E-Ink EPUB</title>
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
 
-  <!-- Barra de navegación -->
+  <!-- Navigation Header -->
   <header class="top-nav">
     <div class="nav-container">
       <div class="brand">
-        <div class="brand-icon">
+        <div class="brand-icon" aria-hidden="true">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
             <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
@@ -23,8 +23,8 @@
           <span class="brand-tag">E-Ink Reflowable EPUB</span>
         </div>
       </div>
-      <a href="http://127.0.0.1:7777" class="hub-link" title="Volver al Hub central">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <a href="http://127.0.0.1:7777" class="hub-link" title="Back to Tools Hub">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
           <polyline points="9 22 9 12 15 12 15 22"></polyline>
         </svg>
@@ -33,113 +33,133 @@
     </div>
   </header>
 
-  <!-- Contenedor Principal -->
+  <!-- Main Content -->
   <main class="main-content">
-    
-    <!-- Selector de Pestañas Principal -->
-    <div class="tabs-container">
-      <button type="button" class="tab-btn active" id="tabBtnWeb" onclick="switchTab('web')">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+
+    <!-- Mode Switcher Tabs -->
+    <div class="tabs-container" role="tablist" aria-label="Conversion mode">
+      <button
+        type="button"
+        class="tab-btn active"
+        id="tabBtnWeb"
+        role="tab"
+        aria-selected="true"
+        aria-controls="panelWeb"
+      >
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="12" cy="12" r="10"></circle>
           <line x1="2" y1="12" x2="22" y2="12"></line>
           <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
         </svg>
-        Artículo Web a EPUB
+        Web Article to EPUB
       </button>
-      <button type="button" class="tab-btn" id="tabBtnPdf" onclick="switchTab('pdf')">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <button
+        type="button"
+        class="tab-btn"
+        id="tabBtnPdf"
+        role="tab"
+        aria-selected="false"
+        aria-controls="panelPdf"
+      >
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
           <polyline points="14 2 14 8 20 8"></polyline>
           <line x1="16" y1="13" x2="8" y2="13"></line>
           <line x1="16" y1="17" x2="8" y2="17"></line>
         </svg>
-        PDF a EPUB (E-Ink)
+        PDF to EPUB (E-Ink)
       </button>
     </div>
 
     <!-- ============================================== -->
-    <!-- PANEL 1: ARTÍCULO WEB A EPUB                   -->
+    <!-- PANEL 1: WEB ARTICLE TO EPUB                   -->
     <!-- ============================================== -->
-    <div id="panelWeb" class="tab-pane active">
-      <!-- Sección de Extracción Web -->
+    <div id="panelWeb" class="tab-pane active" role="tabpanel" aria-labelledby="tabBtnWeb">
       <section class="card extract-card">
         <div class="section-header">
-          <h1>Convertir Artículo Web a EPUB</h1>
-          <p class="section-desc">Extrae el contenido limpio sin publicidad, optimizado tipográficamente para pantallas de tinta electrónica (Kindle Paperwhite, Oasis, Scribe, Kobo).</p>
+          <h1 id="webFormHeading">Convert Web Article to EPUB</h1>
+          <p class="section-desc">Extracts clean article text without ads or visual clutter, typographically formatted for E-Ink displays (Kindle Paperwhite, Oasis, Scribe, Kobo).</p>
         </div>
 
-        <form id="extractForm" onsubmit="handleExtract(event)">
+        <form id="extractForm" aria-labelledby="webFormHeading">
           <div class="input-group">
             <div class="url-input-wrapper">
-              <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
               </svg>
-              <input 
-                type="url" 
-                id="articleUrl" 
-                placeholder="https://ejemplo.com/articulo-interesante" 
+              <label for="articleUrl" class="visually-hidden">Article URL</label>
+              <input
+                type="url"
+                id="articleUrl"
+                name="url"
+                placeholder="https://example.com/interesting-article"
                 required
-                autocomplete="off"
+                autocomplete="url"
+                autocorrect="off"
+                autocapitalize="none"
+                spellcheck="false"
+                inputmode="url"
+                enterkeyhint="go"
               >
             </div>
             <button type="submit" id="btnExtract" class="btn btn-primary">
-              <span class="btn-text">Extraer Artículo</span>
-              <span class="spinner hidden" id="extractSpinner"></span>
+              <span class="btn-text">Extract Article</span>
+              <span class="spinner hidden" id="extractSpinner" aria-hidden="true"></span>
             </button>
           </div>
 
           <div class="extract-options">
-            <label class="checkbox-label">
-              <input type="checkbox" id="includeImages" checked>
-              <span>Descargar e incrustar imágenes en el EPUB</span>
+            <label class="checkbox-label" for="includeImages">
+              <input type="checkbox" id="includeImages" name="include_images" checked>
+              <span>Download and embed article images in the EPUB</span>
             </label>
           </div>
         </form>
 
-        <div id="statusMessage" class="status-box hidden"></div>
+        <div id="statusMessage" class="status-box hidden" role="status" aria-live="polite"></div>
       </section>
 
-      <!-- Sección de Vista Previa y Edición Web -->
+      <!-- Web Preview & Metadata Editor -->
       <section id="previewCard" class="card preview-card hidden">
         <div class="preview-header">
-          <h2>Metadatos y Opciones de Lectura</h2>
-          <span class="badge" id="imagesBadge">0 imágenes</span>
+          <h2>Metadata &amp; Reader Options</h2>
+          <span class="badge" id="imagesBadge">0 images</span>
         </div>
 
         <div class="metadata-grid">
           <div class="form-group full-width">
-            <label for="metaTitle">Título del libro / artículo</label>
-            <input type="text" id="metaTitle" class="form-input">
+            <label for="metaTitle">Book / Article Title</label>
+            <input type="text" id="metaTitle" name="title" class="form-input">
           </div>
 
           <div class="form-group">
-            <label for="metaAuthor">Autor</label>
-            <input type="text" id="metaAuthor" class="form-input">
+            <label for="metaAuthor">Author</label>
+            <input type="text" id="metaAuthor" name="author" class="form-input">
           </div>
 
           <div class="form-group">
-            <label for="metaDate">Fecha</label>
-            <input type="text" id="metaDate" class="form-input" placeholder="AAAA-MM-DD">
+            <label for="metaDate">Publication Date</label>
+            <input type="text" id="metaDate" name="date" class="form-input" placeholder="YYYY-MM-DD">
           </div>
 
           <div class="form-group full-width">
-            <label for="metaSitename">Publicación / Sitio Web</label>
-            <input type="text" id="metaSitename" class="form-input">
+            <label for="metaSitename">Publication / Website</label>
+            <input type="text" id="metaSitename" name="sitename" class="form-input">
           </div>
         </div>
 
-        <!-- Opciones E-Ink -->
-        <div class="options-box">
-          <div class="options-title">Configuración de lectura E-Ink</div>
-          
+        <!-- E-Ink Typography Options -->
+        <fieldset class="options-box">
+          <legend class="options-title">E-Ink Reading Configuration</legend>
+
           <div class="options-row">
             <div class="option-col">
               <label class="radio-label">
                 <input type="radio" name="paragraphStyle" value="book" checked>
                 <div>
-                  <strong>Estilo Libro (Recomendado)</strong>
-                  <p>Sangría de primera línea (1.35em) y lectura continua sin saltos de bloque.</p>
+                  <strong>Book Style (Recommended)</strong>
+                  <p>First-line indentation (1.5em) with continuous editorial paragraph flow.</p>
                 </div>
               </label>
             </div>
@@ -147,26 +167,26 @@
               <label class="radio-label">
                 <input type="radio" name="paragraphStyle" value="article">
                 <div>
-                  <strong>Estilo Artículo</strong>
-                  <p>Sin sangría y con espaciado vertical entre párrafos.</p>
+                  <strong>Article Style</strong>
+                  <p>No indentation with vertical spacing between paragraphs.</p>
                 </div>
               </label>
             </div>
           </div>
 
           <div class="options-row single">
-            <label class="checkbox-label">
-              <input type="checkbox" id="generateCover" checked>
-              <span>Generar portada automática elegante para la biblioteca del Kindle</span>
+            <label class="checkbox-label" for="generateCover">
+              <input type="checkbox" id="generateCover" name="generate_cover" checked>
+              <span>Generate minimalist cover artwork for your Kindle library</span>
             </label>
           </div>
-        </div>
+        </fieldset>
 
-        <!-- Acordeón de Vista Previa -->
+        <!-- Content Preview Accordion -->
         <details class="preview-accordion">
           <summary class="accordion-summary">
-            <span>Vista previa del contenido extraído</span>
-            <span class="accordion-hint">Click para desplegar</span>
+            <span>Preview extracted content</span>
+            <span class="accordion-hint">Click to expand</span>
           </summary>
           <div class="eink-preview-container">
             <div class="eink-screen">
@@ -175,124 +195,122 @@
           </div>
         </details>
 
-        <!-- Botón de Generación -->
+        <!-- Generate Action -->
         <div class="actions-bar">
-          <button type="button" id="btnGenerate" class="btn btn-success" onclick="handleGenerate()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <button type="button" id="btnGenerate" class="btn btn-success">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
-            <span class="btn-text">Generar y Descargar EPUB</span>
-            <span class="spinner hidden" id="generateSpinner"></span>
+            <span class="btn-text">Generate &amp; Download EPUB</span>
+            <span class="spinner hidden" id="generateSpinner" aria-hidden="true"></span>
           </button>
         </div>
 
-        <!-- Resultado de Descarga Web -->
-        <div id="downloadResult" class="download-result hidden">
-          <div class="download-icon">✓</div>
+        <div id="webGenerateStatusMessage" class="status-box hidden" role="status" aria-live="polite"></div>
+
+        <!-- Download Result -->
+        <div id="downloadResult" class="download-result hidden" role="status" aria-live="polite">
+          <div class="download-icon" aria-hidden="true">✓</div>
           <div class="download-info">
-            <h4 id="downloadFileName">articulo.epub</h4>
+            <h4 id="downloadFileName">article.epub</h4>
             <span id="downloadFileSize" class="file-size">0 KB</span>
           </div>
           <a id="downloadBtnLink" href="#" class="btn btn-outline" download>
-            Descargar de nuevo
+            Download again
           </a>
         </div>
       </section>
     </div>
 
     <!-- ============================================== -->
-    <!-- PANEL 2: PDF A EPUB (E-INK VERSÁTIL)          -->
+    <!-- PANEL 2: PDF TO EPUB (E-INK)                   -->
     <!-- ============================================== -->
-    <div id="panelPdf" class="tab-pane">
+    <div id="panelPdf" class="tab-pane" role="tabpanel" aria-labelledby="tabBtnPdf" hidden>
       <section class="card extract-card">
         <div class="section-header">
-          <h1>Conversor de PDF a EPUB Reflowable</h1>
-          <p class="section-desc">Especializado en PDFs complejos: lectura fluida en 2 columnas, desguionado de palabras, extracción de notas al pie enlazadas y división automática de capítulos.</p>
+          <h1 id="pdfFormHeading">PDF to Reflowable EPUB Converter</h1>
+          <p class="section-desc">Built for complex PDFs: seamless multi-column reading order, automatic word de-hyphenation, linked popup footnotes, and smart chapter segmentation.</p>
         </div>
 
-        <form id="pdfForm" onsubmit="handleAnalyzePdf(event)">
-          
-          <!-- Selección de PDF Local o Subida -->
+        <form id="pdfForm" aria-labelledby="pdfFormHeading">
           <div class="pdf-source-box">
             <div class="form-group">
-              <label for="localPdfSelect">PDFs detectados localmente en la carpeta:</label>
+              <label for="localPdfSelect">PDFs detected locally (project folder &amp; Downloads):</label>
               <div class="select-with-btn">
-                <select id="localPdfSelect" class="form-input" onchange="onLocalPdfChange()">
-                  <option value="">-- Seleccionar archivo local --</option>
+                <select id="localPdfSelect" name="local_path" class="form-input">
+                  <option value="">-- Select a local file --</option>
                 </select>
-                <button type="button" class="btn btn-outline btn-sm" onclick="fetchLocalPdfs()" title="Refrescar lista de PDFs">
+                <button type="button" id="btnRefreshPdfs" class="btn btn-outline btn-sm" title="Refresh local PDF list" aria-label="Refresh local PDF list">
                   ↻
                 </button>
               </div>
             </div>
 
-            <div class="divider-text">o subir un archivo desde tu equipo:</div>
+            <div class="divider-text">or upload a PDF file from your computer:</div>
 
             <div class="form-group">
-              <input type="file" id="pdfFileInput" class="form-input" accept=".pdf" onchange="onPdfFileSelected()">
+              <label for="pdfFileInput" class="visually-hidden">Upload PDF file</label>
+              <input type="file" id="pdfFileInput" name="file" class="form-input" accept=".pdf">
             </div>
           </div>
 
-          <!-- Opciones de Columnas -->
           <div class="pdf-options-row">
             <div class="form-group">
-              <label for="pdfColMode">Modo de Columnas:</label>
-              <select id="pdfColMode" class="form-input">
-                <option value="auto" selected>Detección Automática (Recomendado)</option>
-                <option value="2">Forzar 2 Columnas (Libros a doble página/columna)</option>
-                <option value="1">Forzar 1 Columna (Página simple continua)</option>
+              <label for="pdfColMode">Column Layout:</label>
+              <select id="pdfColMode" name="col_mode" class="form-input">
+                <option value="auto" selected>Auto-detect (Recommended)</option>
+                <option value="2">Force 2 Columns (Double-column books/papers)</option>
+                <option value="1">Force 1 Column (Standard single-column layout)</option>
               </select>
             </div>
             <div class="form-actions-inline">
               <button type="submit" id="btnAnalyzePdf" class="btn btn-primary">
-                <span class="btn-text">Analizar y Previsualizar PDF</span>
-                <span class="spinner hidden" id="analyzePdfSpinner"></span>
+                <span class="btn-text">Analyze &amp; Preview PDF</span>
+                <span class="spinner hidden" id="analyzePdfSpinner" aria-hidden="true"></span>
               </button>
             </div>
           </div>
-
         </form>
 
-        <div id="pdfStatusMessage" class="status-box hidden"></div>
+        <div id="pdfStatusMessage" class="status-box hidden" role="status" aria-live="polite"></div>
       </section>
 
-      <!-- Tarjeta de Resultados y Edición de PDF -->
+      <!-- PDF Structure Results & Options -->
       <section id="pdfPreviewCard" class="card preview-card hidden">
         <div class="preview-header">
-          <h2>Estructura del Libro y Opciones E-Ink</h2>
+          <h2>Book Structure &amp; E-Ink Options</h2>
           <div class="badges-row">
-            <span class="badge" id="pdfPagesBadge">0 páginas</span>
+            <span class="badge" id="pdfPagesBadge">0 pages</span>
             <span class="badge" id="pdfColsBadge">Auto</span>
-            <span class="badge" id="pdfChaptersBadge">0 capítulos</span>
-            <span class="badge" id="pdfFootnotesBadge">0 notas</span>
+            <span class="badge" id="pdfChaptersBadge">0 chapters</span>
+            <span class="badge" id="pdfFootnotesBadge">0 footnotes</span>
           </div>
         </div>
 
         <div class="metadata-grid">
           <div class="form-group">
-            <label for="pdfMetaTitle">Título de la obra</label>
-            <input type="text" id="pdfMetaTitle" class="form-input">
+            <label for="pdfMetaTitle">Book Title</label>
+            <input type="text" id="pdfMetaTitle" name="pdf_title" class="form-input">
           </div>
 
           <div class="form-group">
-            <label for="pdfMetaAuthor">Autor</label>
-            <input type="text" id="pdfMetaAuthor" class="form-input">
+            <label for="pdfMetaAuthor">Author</label>
+            <input type="text" id="pdfMetaAuthor" name="pdf_author" class="form-input">
           </div>
         </div>
 
-        <!-- Opciones E-Ink para PDF -->
-        <div class="options-box">
-          <div class="options-title">Configuración de lectura E-Ink</div>
-          
+        <fieldset class="options-box">
+          <legend class="options-title">E-Ink Reading Configuration</legend>
+
           <div class="options-row">
             <div class="option-col">
               <label class="radio-label">
                 <input type="radio" name="pdfParagraphStyle" value="book" checked>
                 <div>
-                  <strong>Estilo Libro (Recomendado)</strong>
-                  <p>Sangría tradicional de 1.35em y flujo de lectura continuo sin saltos.</p>
+                  <strong>Book Style (Recommended)</strong>
+                  <p>Traditional 1.5em paragraph indentation with seamless book flow.</p>
                 </div>
               </label>
             </div>
@@ -300,57 +318,56 @@
               <label class="radio-label">
                 <input type="radio" name="pdfParagraphStyle" value="article">
                 <div>
-                  <strong>Estilo Artículo</strong>
-                  <p>Sin sangría y con espaciado vertical entre párrafos.</p>
+                  <strong>Article Style</strong>
+                  <p>No indentation with vertical spacing between paragraphs.</p>
                 </div>
               </label>
             </div>
           </div>
 
           <div class="options-row single">
-            <label class="checkbox-label">
-              <input type="checkbox" id="pdfGenerateCover" checked>
-              <span>Generar portada visual elegante para la biblioteca del Kindle</span>
+            <label class="checkbox-label" for="pdfGenerateCover">
+              <input type="checkbox" id="pdfGenerateCover" name="pdf_generate_cover" checked>
+              <span>Generate minimalist cover artwork for your Kindle library</span>
             </label>
           </div>
-        </div>
+        </fieldset>
 
-        <!-- Capítulos Detectados -->
+        <!-- Detected Chapters -->
         <div class="chapters-box">
           <div class="chapters-header">
-            <h3>Tabla de Contenidos y Capítulos Detectados</h3>
-            <span class="chapters-hint">Se compilarán como secciones navegables en el EPUB</span>
+            <h3>Table of Contents &amp; Detected Chapters</h3>
+            <span class="chapters-hint">Compiled into navigable EPUB chapters</span>
           </div>
-          <div id="chaptersList" class="chapters-list">
-            <!-- Capítulos inyectados dinámicamente -->
-          </div>
+          <div id="chaptersList" class="chapters-list"></div>
         </div>
 
-        <!-- Botón de Generación PDF -->
+        <!-- Compile EPUB Action -->
         <div class="actions-bar">
-          <button type="button" id="btnGeneratePdf" class="btn btn-success" onclick="handleConvertPdf()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <button type="button" id="btnGeneratePdf" class="btn btn-success">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
-            <span class="btn-text">Compilar y Descargar EPUB Completo</span>
-            <span class="spinner hidden" id="generatePdfSpinner"></span>
+            <span class="btn-text">Compile &amp; Download Complete EPUB</span>
+            <span class="spinner hidden" id="generatePdfSpinner" aria-hidden="true"></span>
           </button>
         </div>
 
-        <!-- Resultado de Descarga PDF -->
-        <div id="pdfDownloadResult" class="download-result hidden">
-          <div class="download-icon">✓</div>
+        <div id="pdfGenerateStatusMessage" class="status-box hidden" role="status" aria-live="polite"></div>
+
+        <!-- PDF Download Result -->
+        <div id="pdfDownloadResult" class="download-result hidden" role="status" aria-live="polite">
+          <div class="download-icon" aria-hidden="true">✓</div>
           <div class="download-info">
-            <h4 id="pdfDownloadFileName">libro.epub</h4>
+            <h4 id="pdfDownloadFileName">book.epub</h4>
             <span id="pdfDownloadFileSize" class="file-size">0 KB</span>
           </div>
           <a id="pdfDownloadBtnLink" href="#" class="btn btn-outline" download>
-            Descargar de nuevo
+            Download again
           </a>
         </div>
-
       </section>
     </div>
 

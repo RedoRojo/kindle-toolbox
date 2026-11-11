@@ -1,9 +1,10 @@
 """
-Generador de libros electrónicos EPUB3 reflowable optimizado para lectores E-Ink y Kindle.
-Construye paquetes EPUB con hojas de estilo tipográficas, navegación dual (NCX y Nav),
-portada automática de alta resolución y almacenamiento de imágenes como activos locales.
+Reflowable EPUB3 e-book generator optimized for E-Ink displays and Kindle devices.
+Builds EPUB packages with editorial typographic stylesheets, dual navigation
+(NCX and EPUB3 Nav), high-resolution cover artwork, and embedded image assets.
 """
 
+from html import escape as html_escape
 import io
 import os
 import re
@@ -12,7 +13,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
-from bs4 import BeautifulSoup
 from ebooklib import epub
 from PIL import Image, ImageDraw, ImageFont
 
@@ -20,16 +20,29 @@ OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def _esc(value: Optional[str]) -> str:
+    """Safely escapes plain text for valid XML/XHTML interpolation."""
+    return html_escape(value or "", quote=True)
+
+
 def clean_filename(title: str, author: Optional[str] = None, max_len: int = 100) -> str:
     """
-    Genera un nombre de archivo seguro y legible para el EPUB.
+    Generates a filesystem-safe, human-readable filename for the output EPUB.
     """
-    clean_t = title.strip() if title else "Articulo"
+    clean_t = title.strip() if title else "Article"
     clean_t = re.sub(r'[\\/*?:"<>|]', " - ", clean_t)
     clean_t = re.sub(r"\s+", " ", clean_t).strip(" -_")
 
     clean_a = ""
-    if author and author.strip() and author.lower() not in ("autor desconocido", "desconocido", "none", "null"):
+    unknown_authors = {
+        "unknown author",
+        "unknown",
+        "autor desconocido",
+        "desconocido",
+        "none",
+        "null",
+    }
+    if author and author.strip() and author.lower() not in unknown_authors:
         ca = re.sub(r'[\\/*?:"<>|]', "", author.strip())
         ca = re.sub(r"\s+", " ", ca).strip(" -_")
         if ca:
@@ -44,14 +57,14 @@ def clean_filename(title: str, author: Optional[str] = None, max_len: int = 100)
             full_name = truncated.strip(" -_")
 
     if not full_name:
-        full_name = "Articulo"
+        full_name = "Article"
 
     return f"{full_name}.epub"
 
 
 def get_available_font(font_type: str = "serif", size: int = 40) -> ImageFont.ImageFont:
     """
-    Busca una fuente TrueType instalada en el sistema, con fallback seguro a la predeterminada.
+    Locates an installed system TrueType font with a safe default fallback.
     """
     candidates = []
     if font_type == "serif":
@@ -85,43 +98,42 @@ def get_available_font(font_type: str = "serif", size: int = 40) -> ImageFont.Im
 
 def generate_cover_image(title: str, author: str, sitename: str = "") -> bytes:
     """
-    Genera una portada minimalista y sobria de 1200x1800 px (ratio 2:3) para e-readers.
-    Estilo editorial clásico: fondo marfil cálido (#FAF7F2), doble marco elegante,
-    autor con espaciado superior, título en tipografía con remates (serif) y detalles sobrios.
+    Generates a classic, restrained 1200x1800 px (2:3 ratio) cover image for e-readers.
+    Warm ivory background (#FAF7F2), double hairline frame with corner ornaments,
+    tracked uppercase author header, centered serif title, and sober footer.
     """
     width, height = 1200, 1800
     img = Image.new("RGB", (width, height), color="#FAF7F2")
     draw = ImageDraw.Draw(img)
 
-    # Marco exterior clásico
+    # Outer editorial border
     outer_m = 50
     draw.rectangle(
         [(outer_m, outer_m), (width - outer_m, height - outer_m)],
         outline="#2C2C2C",
-        width=4
+        width=4,
     )
 
-    # Marco interior fino
+    # Inner hairline frame
     inner_m = 65
     draw.rectangle(
         [(inner_m, inner_m), (width - inner_m, height - inner_m)],
         outline="#777777",
-        width=1
+        width=1,
     )
 
-    # Detalles ornamentales en las cuatro esquinas
+    # Corner ornaments
     ornament_size = 14
     for cx in (inner_m + 8, width - inner_m - 8 - ornament_size):
         for cy in (inner_m + 8, height - inner_m - 8 - ornament_size):
             draw.rectangle([(cx, cy), (cx + ornament_size, cy + ornament_size)], outline="#555555", width=1)
 
-    # Fuentes
     author_font = get_available_font("sans", size=34)
     title_font = get_available_font("serif", size=68)
     footer_font = get_available_font("sans", size=24)
 
-    # 1. Autor en la parte superior
-    author_clean = author.strip() if author else "AUTOR DESCONOCIDO"
+    # 1. Author header
+    author_clean = author.strip() if author else "UNKNOWN AUTHOR"
     author_display = "  ".join(w.upper() for w in author_clean.split())
     author_bbox = draw.textbbox((0, 0), author_display, font=author_font)
     author_w = author_bbox[2] - author_bbox[0]
@@ -129,11 +141,11 @@ def generate_cover_image(title: str, author: str, sitename: str = "") -> bytes:
     author_y = 220
     draw.text((author_x, author_y), author_display, fill="#2C2C2C", font=author_font)
 
-    # Línea sutil bajo el autor
+    # Subtle rule below author
     line_author_y = author_y + 60
     draw.line([(width // 2 - 80, line_author_y), (width // 2 + 80, line_author_y)], fill="#777777", width=1)
 
-    # 2. Título en el centro
+    # 2. Centered title wrapped across lines
     max_text_width = width - (inner_m * 2 + 140)
     words = title.split()
     lines = []
@@ -151,16 +163,15 @@ def generate_cover_image(title: str, author: str, sitename: str = "") -> bytes:
     if curr_line:
         lines.append(" ".join(curr_line))
 
-    # Limitar a máximo 7 líneas en portada
+    # Cap at 7 lines on cover
     lines = lines[:7]
     line_spacing = 28
     line_heights = [
         draw.textbbox((0, 0), line, font=title_font)[3] - draw.textbbox((0, 0), line, font=title_font)[1]
         for line in lines
-    ]
-    total_title_height = sum(line_heights) + (len(lines) - 1) * line_spacing
+    ] or [68]
+    total_title_height = sum(line_heights) + max(0, len(lines) - 1) * line_spacing
 
-    # Posición vertical centrada en la zona media-superior
     y_start = int((height * 0.46) - (total_title_height / 2))
     for idx, line in enumerate(lines):
         bbox = draw.textbbox((0, 0), line, font=title_font)
@@ -169,13 +180,13 @@ def generate_cover_image(title: str, author: str, sitename: str = "") -> bytes:
         draw.text((x, y_start), line, fill="#111111", font=title_font)
         y_start += line_heights[idx] + line_spacing
 
-    # Separador ornamental bajo el título
+    # Ornamental divider under title
     sep_y = y_start + 45
     draw.line([(width // 2 - 140, sep_y), (width // 2 + 140, sep_y)], fill="#333333", width=2)
     draw.line([(width // 2 - 80, sep_y + 6), (width // 2 + 80, sep_y + 6)], fill="#777777", width=1)
 
-    # 3. Pie de página
-    footer_text = sitename.upper() if sitename else "KINDLE TOOLBOX • EDICIÓN DIGITAL"
+    # 3. Footer caption
+    footer_text = sitename.upper() if sitename else "KINDLE TOOLBOX • DIGITAL EDITION"
     footer_display = "  ".join(footer_text.split())
     footer_bbox = draw.textbbox((0, 0), footer_display, font=footer_font)
     footer_w = footer_bbox[2] - footer_bbox[0]
@@ -188,7 +199,7 @@ def generate_cover_image(title: str, author: str, sitename: str = "") -> bytes:
 
 def build_epub_css(paragraph_style: str = "book") -> str:
     """
-    Retorna la hoja de estilos CSS optimizada específicamente para pantallas de tinta electrónica (E-Ink).
+    Returns an E-Ink optimized typographic stylesheet tailored for Kindle and EPUB3 readers.
     """
     if paragraph_style == "article":
         p_style = """
@@ -198,7 +209,7 @@ p {
   text-indent: 0;
 }
 """
-    else:  # book style estándar
+    else:  # Standard editorial book style
         p_style = """
 p {
   margin-top: 0;
@@ -207,7 +218,6 @@ p {
   text-align: justify;
   line-height: 1.45;
 }
-p.asangre,
 p.no-indent,
 .chapter-header + p,
 h1 + p, h2 + p, h3 + p, h4 + p, h5 + p, h6 + p,
@@ -236,20 +246,20 @@ body {{
   padding: 0;
 }}
 
-/* Maquetación de cubierta y front-matter profesional */
-.sinmargen {{
+/* Cover and Front Matter Layout */
+.no-margin {{
   margin: 0 !important;
   padding: 0 !important;
 }}
 
-.cubierta {{
+.cover-page {{
   text-align: center;
   padding: 0;
   margin: 0;
   height: 100%;
 }}
 
-.cubierta img {{
+.cover-page img {{
   height: 100%;
   max-height: 100vh;
   max-width: 100%;
@@ -258,13 +268,13 @@ body {{
   object-fit: contain;
 }}
 
-.portadilla {{
+.half-title {{
   text-align: center;
   margin-top: 15%;
   margin-bottom: 20%;
 }}
 
-.portadilla-autor {{
+.half-title-author {{
   font-family: "Amazon Ember", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 1.25em;
   letter-spacing: 0.18em;
@@ -273,7 +283,7 @@ body {{
   margin-bottom: 2.2em;
 }}
 
-.portadilla-titulo {{
+.half-title-title {{
   font-family: "Bookerly", "Charter", "Georgia", serif;
   font-size: 2.2em;
   font-weight: 700;
@@ -282,14 +292,14 @@ body {{
   color: #000000;
 }}
 
-.portadilla-subtitulo {{
+.half-title-subtitle {{
   font-size: 1.1em;
   font-style: italic;
   color: #555555;
   margin-bottom: 2em;
 }}
 
-.portadilla-v {{
+.half-title-brand {{
   font-family: "Amazon Ember", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 0.85em;
   letter-spacing: 0.25em;
@@ -324,16 +334,16 @@ body {{
   color: #666666;
 }}
 
-.salto10 {{
+.spacer-sm {{
   margin-top: 1em;
 }}
 
-.salto25 {{
+.spacer-lg {{
   margin-top: 2.5em;
 }}
 
-/* Subtítulos de sección romana (I, II, III...) dentro de capítulos */
-.subtitulo-seccion {{
+/* Section Subtitles (e.g., I, II, III) inside Chapters */
+.section-subtitle {{
   font-family: "Amazon Ember", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 1.35em;
   font-weight: 700;
@@ -346,7 +356,7 @@ body {{
   break-after: avoid;
 }}
 
-.subtitulo-seccion + p {{
+.section-subtitle + p {{
   text-indent: 0 !important;
 }}
 
@@ -362,7 +372,7 @@ body {{
   text-indent: 0 !important;
 }}
 
-.firma-fecha {{
+.signature-date {{
   margin-top: 1.8em;
   margin-bottom: 0.3em;
   text-align: right;
@@ -371,7 +381,7 @@ body {{
   text-indent: 0 !important;
 }}
 
-.firma-nota {{
+.signature-note {{
   margin-top: 0.2em;
   margin-bottom: 2em;
   text-align: right;
@@ -388,7 +398,6 @@ body {{
   color: #666666;
   text-indent: 0 !important;
 }}
-
 
 {p_style}
 
@@ -573,7 +582,7 @@ a {{
   text-decoration: underline;
 }}
 
-/* Estilos de notas al pie para Kindle */
+/* Kindle & EPUB3 Popup Footnote Styles */
 .footnote-ref {{
   font-size: 0.75em;
   vertical-align: super;
@@ -624,16 +633,22 @@ def format_xhtml_content(
     date: str,
     sitename: str,
     url: str,
-    body_html: str
+    body_html: str,
+    lang: str = "en",
 ) -> str:
     """
-    Formatea el contenido del artículo como un documento XHTML válido para EPUB3.
+    Formats extracted article HTML into a valid EPUB3 XHTML document.
     """
-    author_line = f'<p class="chapter-author"><strong>Autor:</strong> {author}</p>' if author else ""
-    date_line = f'<p class="chapter-date"><strong>Fecha:</strong> {date}</p>' if date else ""
-    source_line = f'<p class="chapter-source"><strong>Publicado en:</strong> {sitename}</p>' if sitename else ""
+    safe_title = _esc(title)
+    safe_lang = _esc(lang or "en")
 
-    meta_block = f"""
+    author_line = f'<p class="chapter-author"><strong>Author:</strong> {_esc(author)}</p>' if author else ""
+    date_line = f'<p class="chapter-date"><strong>Date:</strong> {_esc(date)}</p>' if date else ""
+    source_line = f'<p class="chapter-source"><strong>Published in:</strong> {_esc(sitename)}</p>' if sitename else ""
+
+    meta_block = ""
+    if author_line or date_line or source_line:
+        meta_block = f"""
     <div class="chapter-meta">
       {author_line}
       {date_line}
@@ -641,26 +656,33 @@ def format_xhtml_content(
     </div>
 """
 
+    safe_url = _esc(url)
+    footer_block = (
+        f"""
+  <footer class="chapter-footer">
+    <p>Original article: <a href="{safe_url}">{safe_url}</a></p>
+  </footer>"""
+        if url
+        else ""
+    )
+
     return f"""<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="es" lang="es">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="{safe_lang}" lang="{safe_lang}">
 <head>
   <meta charset="utf-8" />
-  <title>{title}</title>
+  <title>{safe_title}</title>
   <link rel="stylesheet" type="text/css" href="style/epub.css" />
 </head>
 <body>
   <header class="chapter-header">
-    <h1 class="chapter-title">{title}</h1>
+    <h1 class="chapter-title">{safe_title}</h1>
     {meta_block}
     <hr class="header-divider" />
   </header>
   <div class="chapter-body">
     {body_html}
-  </div>
-  <footer class="chapter-footer">
-    <p>Artículo original: <a href="{url}">{url}</a></p>
-  </footer>
+  </div>{footer_block}
 </body>
 </html>"""
 
@@ -668,97 +690,98 @@ def format_xhtml_content(
 def create_epub_book(
     article_data: Dict[str, Any],
     paragraph_style: str = "book",
-    generate_cover: bool = True
+    generate_cover: bool = True,
 ) -> Dict[str, Any]:
     """
-    Crea el archivo EPUB con metadatos completos, hojas de estilo E-Ink,
-    imágenes embebidas en el contenedor y portada visual.
-    Retorna información del archivo generado (nombre, ruta, tamaño).
+    Creates a single-article EPUB3 file with complete metadata, E-Ink CSS,
+    embedded local images, and generated cover artwork.
+    Returns generated file details (filename, filepath, filesize).
     """
-    title = article_data.get("title", "Artículo Web").strip()
-    author = article_data.get("author", "Autor Desconocido").strip()
-    date = article_data.get("date", "").strip()
-    sitename = article_data.get("sitename", "").strip()
-    url = article_data.get("url", "").strip()
-    body_html = article_data.get("html_body", "<p></p>")
+    title = (article_data.get("title") or "Web Article").strip()
+    author = (article_data.get("author") or "Unknown Author").strip()
+    date = (article_data.get("date") or "").strip()
+    sitename = (article_data.get("sitename") or "").strip()
+    url = (article_data.get("url") or "").strip()
+    lang = (article_data.get("language") or "en").strip() or "en"
+    body_html = article_data.get("html_body") or "<p></p>"
     images = article_data.get("images", [])
 
     book = epub.EpubBook()
 
-    # Metadatos del libro
+    # Book metadata
     book_id = str(uuid.uuid4())
     book.set_identifier(f"urn:uuid:{book_id}")
     book.set_title(title)
-    book.set_language("es")
+    book.set_language(lang)
     book.add_author(author)
 
     book.add_metadata("DC", "date", date or datetime.now().strftime("%Y-%m-%d"))
     book.add_metadata("DC", "publisher", sitename or "Kindle Toolbox")
-    book.add_metadata("DC", "description", f"Convertido para lectura E-Ink/Kindle desde {url}")
+    book.add_metadata(
+        "DC",
+        "description",
+        f"Converted for E-Ink/Kindle reading from {url}" if url else "Converted for E-Ink/Kindle reading",
+    )
 
-    # Portada visual
+    # Cover image
     if generate_cover:
         try:
             cover_bytes = generate_cover_image(title, author, sitename)
             book.set_cover("cover.jpg", cover_bytes)
-        except Exception as e:
-            # Continuar sin portada si falla
+        except Exception:
             pass
 
-    # Hoja de estilo CSS
+    # Stylesheet
     css_content = build_epub_css(paragraph_style=paragraph_style)
     css_item = epub.EpubItem(
         uid="style_epub",
         file_name="style/epub.css",
         media_type="text/css",
-        content=css_content.encode("utf-8")
+        content=css_content.encode("utf-8"),
     )
     book.add_item(css_item)
 
-    # Añadir imágenes locales
+    # Embedded image assets
     for img in images:
         img_item = epub.EpubItem(
             uid=img["id"],
             file_name=img["rel_path"],
             media_type=img["media_type"],
-            content=img["content"]
+            content=img["content"],
         )
         book.add_item(img_item)
 
-    # Capítulo principal
+    # Main article chapter
     xhtml_doc = format_xhtml_content(
         title=title,
         author=author,
         date=date,
         sitename=sitename,
         url=url,
-        body_html=body_html
+        body_html=body_html,
+        lang=lang,
     )
 
     chapter = epub.EpubHtml(
         title=title,
         file_name="chap_01.xhtml",
-        lang="es"
+        lang=lang,
     )
     chapter.content = xhtml_doc.encode("utf-8")
     chapter.add_item(css_item)
     book.add_item(chapter)
 
-    # Navegación y Tabla de Contenidos (TOC)
+    # Table of contents & dual navigation
     book.toc = (epub.Link("chap_01.xhtml", title, "chap_01"),)
-
-    # Documentos de navegación dual para máxima compatibilidad
     book.add_item(epub.EpubNcx())
     book.add_item(epub.EpubNav())
 
-    # Spine (orden de lectura)
+    # Reading spine
     book.spine = ["nav", chapter]
 
-    # Guardar en disco
     out_filename = clean_filename(title, author)
     out_path = OUTPUT_DIR / out_filename
 
-    # Evitar sobreescrituras no deseadas
     counter = 2
     base_stem = out_path.stem
     while out_path.exists():
@@ -767,7 +790,6 @@ def create_epub_book(
         counter += 1
 
     epub.write_epub(str(out_path), book, {})
-
     filesize = out_path.stat().st_size
 
     return {
@@ -775,7 +797,7 @@ def create_epub_book(
         "filepath": str(out_path),
         "filesize": filesize,
         "title": title,
-        "author": author
+        "author": author,
     }
 
 
@@ -783,159 +805,166 @@ def create_multi_chapter_epub(
     book_data: Dict[str, Any],
     chapters: List[Dict[str, Any]],
     paragraph_style: str = "book",
-    generate_cover: bool = True
+    generate_cover: bool = True,
 ) -> Dict[str, Any]:
     """
-    Crea un libro EPUB3 reflowable multi-capítulo a partir de documentos PDF estructurados.
-    Construye la navegación TOC completa (NCX y Nav) y hojas de estilo optimizadas.
+    Creates a multi-chapter reflowable EPUB3 book from structured PDF content.
+    Generates front matter (cover, half-title, credits), full TOC (NCX + Nav),
+    and E-Ink optimized typographic stylesheets.
     """
-    title = book_data.get("title", "Libro Digital").strip()
-    author = book_data.get("author", "Autor Desconocido").strip()
-    date = book_data.get("date", "").strip()
-    sitename = book_data.get("sitename", "Kindle Toolbox").strip()
+    title = (book_data.get("title") or "Digital Book").strip()
+    author = (book_data.get("author") or "Unknown Author").strip()
+    date = (book_data.get("date") or "").strip()
+    sitename = (book_data.get("sitename") or "Kindle Toolbox").strip()
+    lang = (book_data.get("language") or "en").strip() or "en"
     images = book_data.get("images", [])
+
+    safe_title = _esc(title)
+    safe_author = _esc(author)
+    safe_lang = _esc(lang)
 
     book = epub.EpubBook()
     book_id = str(uuid.uuid4())
     book.set_identifier(f"urn:uuid:{book_id}")
     book.set_title(title)
-    book.set_language("es")
+    book.set_language(lang)
     book.add_author(author)
 
     book.add_metadata("DC", "date", date or datetime.now().strftime("%Y-%m-%d"))
     book.add_metadata("DC", "publisher", sitename or "Kindle Toolbox")
-    book.add_metadata("DC", "description", "Convertido desde documento PDF para lectura E-Ink/Kindle")
+    book.add_metadata("DC", "description", "Converted from PDF document for E-Ink/Kindle reading")
 
     css_content = build_epub_css(paragraph_style=paragraph_style)
     css_item = epub.EpubItem(
         uid="style_epub",
         file_name="style/epub.css",
         media_type="text/css",
-        content=css_content.encode("utf-8")
+        content=css_content.encode("utf-8"),
     )
     book.add_item(css_item)
 
-    # 1. Cubierta (cover.jpg + cubierta.xhtml a pantalla completa)
-    cubierta_item = None
+    # 1. Cover page (cover.jpg + full-bleed cover.xhtml)
+    cover_item = None
     if generate_cover:
         try:
             cover_bytes = generate_cover_image(title, author, sitename)
             book.set_cover("cover.jpg", cover_bytes, create_page=False)
 
-            cubierta_doc = """<?xml version="1.0" encoding="utf-8"?>
+            cover_doc = f"""<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="es" lang="es">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="{safe_lang}" lang="{safe_lang}">
 <head>
   <meta charset="utf-8" />
-  <title>Cubierta</title>
+  <title>Cover</title>
   <link rel="stylesheet" type="text/css" href="style/epub.css" />
 </head>
-<body class="sinmargen">
-  <div class="cubierta">
-    <img alt="Cubierta" src="cover.jpg" />
+<body class="no-margin">
+  <div class="cover-page">
+    <img alt="Cover" src="cover.jpg" />
   </div>
 </body>
 </html>"""
-            cubierta_item = epub.EpubHtml(
-                title="Cubierta",
-                file_name="cubierta.xhtml",
-                lang="es"
+            cover_item = epub.EpubHtml(
+                title="Cover",
+                file_name="cover.xhtml",
+                lang=lang,
             )
-            cubierta_item.content = cubierta_doc.encode("utf-8")
-            cubierta_item.add_item(css_item)
-            book.add_item(cubierta_item)
+            cover_item.content = cover_doc.encode("utf-8")
+            cover_item.add_item(css_item)
+            book.add_item(cover_item)
         except Exception:
             pass
 
-    # 2. Portadilla interior (titulo.xhtml)
-    titulo_doc = f"""<?xml version="1.0" encoding="utf-8"?>
+    # 2. Half-title page (title.xhtml)
+    title_doc = f"""<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="es" lang="es">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="{safe_lang}" lang="{safe_lang}">
 <head>
   <meta charset="utf-8" />
-  <title>{title}</title>
+  <title>{safe_title}</title>
   <link rel="stylesheet" type="text/css" href="style/epub.css" />
 </head>
 <body>
-  <div class="portadilla">
-    <p class="portadilla-autor">{author}</p>
-    <h1 class="portadilla-titulo">{title}</h1>
-    <p class="portadilla-v">KINDLE TOOLBOX</p>
+  <div class="half-title">
+    <p class="half-title-author">{safe_author}</p>
+    <h1 class="half-title-title">{safe_title}</h1>
+    <p class="half-title-brand">KINDLE TOOLBOX</p>
   </div>
 </body>
 </html>"""
-    titulo_item = epub.EpubHtml(
+    title_item = epub.EpubHtml(
         title=title,
-        file_name="titulo.xhtml",
-        lang="es"
+        file_name="title.xhtml",
+        lang=lang,
     )
-    titulo_item.content = titulo_doc.encode("utf-8")
-    titulo_item.add_item(css_item)
-    book.add_item(titulo_item)
+    title_item.content = title_doc.encode("utf-8")
+    title_item.add_item(css_item)
+    book.add_item(title_item)
 
-    # 3. Información editorial y créditos (info.xhtml)
+    # 3. Edition info & credits page (credits.xhtml)
     edition_info = book_data.get("edition_info", "")
-    info_doc = f"""<?xml version="1.0" encoding="utf-8"?>
+    credits_doc = f"""<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="es" lang="es">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="{safe_lang}" lang="{safe_lang}">
 <head>
   <meta charset="utf-8" />
-  <title>Página de créditos</title>
+  <title>Credits</title>
   <link rel="stylesheet" type="text/css" href="style/epub.css" />
 </head>
 <body>
   <div class="info-page">
-    <h2 class="info-title">{title}</h2>
-    <p class="info-author"><strong>Autor:</strong> {author}</p>
-    <div class="salto10"></div>
+    <h2 class="info-title">{safe_title}</h2>
+    <p class="info-author"><strong>Author:</strong> {safe_author}</p>
+    <div class="spacer-sm"></div>
     {edition_info}
-    <div class="salto25"></div>
-    <p class="info-small">Edición digital generada con <strong>Kindle Toolbox</strong>.</p>
+    <div class="spacer-lg"></div>
+    <p class="info-small">Digital edition generated with <strong>Kindle Toolbox</strong>.</p>
   </div>
 </body>
 </html>"""
-    info_item = epub.EpubHtml(
-        title="Página de créditos",
-        file_name="info.xhtml",
-        lang="es"
+    credits_item = epub.EpubHtml(
+        title="Credits",
+        file_name="credits.xhtml",
+        lang=lang,
     )
-    info_item.content = info_doc.encode("utf-8")
-    info_item.add_item(css_item)
-    book.add_item(info_item)
+    credits_item.content = credits_doc.encode("utf-8")
+    credits_item.add_item(css_item)
+    book.add_item(credits_item)
 
-    # Activos de imagen
+    # Image assets
     for img in images:
         img_item = epub.EpubItem(
             uid=img["id"],
             file_name=img["rel_path"],
             media_type=img["media_type"],
-            content=img["content"]
+            content=img["content"],
         )
         book.add_item(img_item)
 
-    # Capítulos narrativos
+    # Narrative chapters
     epub_chapters = []
     toc_links = []
 
     for idx, chap in enumerate(chapters):
-        c_title = chap.get("title", f"Capítulo {idx+1}")
-        c_part = chap.get("part", "").strip()
-        c_html = chap.get("html_body", "<p></p>")
-        file_name = f"chap_{idx+1:02d}.xhtml"
+        c_title = chap.get("title") or f"Chapter {idx + 1}"
+        c_part = (chap.get("part") or "").strip()
+        c_html = chap.get("html_body") or "<p></p>"
+        file_name = f"chap_{idx + 1:02d}.xhtml"
 
-        part_header_html = f'    <p class="chapter-part">{c_part}</p>\n' if c_part else ""
+        safe_c_title = _esc(c_title)
+        part_header_html = f'    <p class="chapter-part">{_esc(c_part)}</p>\n' if c_part else ""
 
         xhtml_doc = f"""<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="es" lang="es">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="{safe_lang}" lang="{safe_lang}">
 <head>
   <meta charset="utf-8" />
-  <title>{c_title}</title>
+  <title>{safe_c_title}</title>
   <link rel="stylesheet" type="text/css" href="style/epub.css" />
 </head>
 <body>
   <header class="chapter-header">
-{part_header_html}    <h1 class="chapter-title">{c_title}</h1>
+{part_header_html}    <h1 class="chapter-title">{safe_c_title}</h1>
     <hr class="header-divider" />
   </header>
   <div class="chapter-body">
@@ -947,31 +976,31 @@ def create_multi_chapter_epub(
         c_item = epub.EpubHtml(
             title=c_title,
             file_name=file_name,
-            lang="es"
+            lang=lang,
         )
         c_item.content = xhtml_doc.encode("utf-8")
         c_item.add_item(css_item)
         book.add_item(c_item)
 
         epub_chapters.append(c_item)
-        toc_links.append(epub.Link(file_name, c_title, f"chap_{idx+1:02d}"))
+        toc_links.append(epub.Link(file_name, c_title, f"chap_{idx + 1:02d}"))
 
-    # Navegación y Tabla de Contenidos (TOC)
+    # Table of contents & dual navigation
     front_matter_links = []
-    if cubierta_item:
-        front_matter_links.append(epub.Link("cubierta.xhtml", "Cubierta", "cover_page"))
-    front_matter_links.append(epub.Link("titulo.xhtml", title, "title_page"))
-    front_matter_links.append(epub.Link("info.xhtml", "Página de créditos", "credits_page"))
+    if cover_item:
+        front_matter_links.append(epub.Link("cover.xhtml", "Cover", "cover_page"))
+    front_matter_links.append(epub.Link("title.xhtml", title, "title_page"))
+    front_matter_links.append(epub.Link("credits.xhtml", "Credits", "credits_page"))
 
     book.toc = tuple(front_matter_links + toc_links)
     book.add_item(epub.EpubNcx())
     book.add_item(epub.EpubNav())
 
-    # Spine (orden secuencial de lectura)
+    # Reading spine
     front_matter_spine = []
-    if cubierta_item:
-        front_matter_spine.append(cubierta_item)
-    front_matter_spine.extend([titulo_item, info_item])
+    if cover_item:
+        front_matter_spine.append(cover_item)
+    front_matter_spine.extend([title_item, credits_item])
 
     book.spine = ["nav"] + front_matter_spine + epub_chapters
 
@@ -994,6 +1023,5 @@ def create_multi_chapter_epub(
         "filesize": filesize,
         "title": title,
         "author": author,
-        "chapters_count": len(chapters)
+        "chapters_count": len(chapters),
     }
-

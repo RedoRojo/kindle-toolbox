@@ -4,16 +4,24 @@ set -e
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 cd "$DIR"
 
-CONDA_ENV_PY="/home/redo/miniconda3/envs/pdf-toolkit/bin/python"
+CONDA_ENV_PY="${KINDLE_TOOLBOX_PYTHON:-$HOME/miniconda3/envs/pdf-toolkit/bin/python}"
 
-if [ ! -f "$CONDA_ENV_PY" ]; then
-    echo "Conda environment 'pdf-toolkit' not found at $CONDA_ENV_PY"
-    echo "Attempting to activate via conda..."
-    eval "$(/home/redo/miniconda3/bin/conda shell.bash hook 2>/dev/null || true)"
-    conda activate pdf-toolkit 2>/dev/null || true
-    PYTHON_CMD="python"
-else
+if [ -x "$CONDA_ENV_PY" ]; then
     PYTHON_CMD="$CONDA_ENV_PY"
+elif [ -x ".venv/bin/python" ]; then
+    PYTHON_CMD=".venv/bin/python"
+elif [ -x "venv/bin/python" ]; then
+    PYTHON_CMD="venv/bin/python"
+else
+    if command -v conda >/dev/null 2>&1; then
+        eval "$(conda shell.bash hook 2>/dev/null || true)"
+        conda activate pdf-toolkit 2>/dev/null || true
+    fi
+    if command -v python3 >/dev/null 2>&1; then
+        PYTHON_CMD="python3"
+    else
+        PYTHON_CMD="python"
+    fi
 fi
 
 # Ensure ebooklib is installed
@@ -30,7 +38,8 @@ while is_port_in_use "$PORT"; do
 done
 
 echo "=========================================================="
-echo " Kindle Toolbox started successfully with Miniconda"
+echo " Kindle Toolbox started successfully"
+echo " Python: $PYTHON_CMD"
 echo " Web Interface: http://127.0.0.1:$PORT"
 echo "=========================================================="
 

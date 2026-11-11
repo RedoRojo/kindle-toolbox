@@ -1,13 +1,12 @@
 """
-Módulo de extracción y limpieza web para Kindle Toolbox.
-Portado y optimizado a partir de pdf-toolbox para generar HTML semántico
-y assets de imágenes limpios para libros electrónicos EPUB3.
+Web extraction and content cleaning module for Kindle Toolbox.
+Generates clean semantic HTML and optimized local image assets for EPUB3 e-books.
 """
 
+import base64
 import io
 import re
-from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Tuple
 from urllib.parse import urljoin, urlparse
 
 import httpx
@@ -21,13 +20,40 @@ DEFAULT_USER_AGENT = (
 )
 
 
+def detect_document_language(text_or_html: str, soup: BeautifulSoup = None) -> str:
+    """
+    Detects the primary document language (e.g., 'en', 'es', 'fr', 'de')
+    from HTML lang attributes or lightweight stopword heuristics, defaulting to 'en'.
+    """
+    if soup is not None:
+        html_tag = soup.find("html")
+        if html_tag:
+            raw_lang = html_tag.get("lang") or html_tag.get("xml:lang") or ""
+            lang_code = raw_lang.strip().split("-")[0].split("_")[0].lower()
+            if len(lang_code) == 2 and lang_code.isalpha():
+                return lang_code
+
+        meta_lang = soup.find("meta", attrs={"http-equiv": re.compile(r"content-language", re.I)})
+        if meta_lang and meta_lang.get("content"):
+            lang_code = meta_lang["content"].strip().split("-")[0].split(",")[0].lower()
+            if len(lang_code) == 2 and lang_code.isalpha():
+                return lang_code
+
+    sample = f" {text_or_html[:4000].lower()} "
+    es_hits = sum(sample.count(w) for w in (" de ", " la ", " el ", " los ", " las ", " que ", " por ", " para "))
+    en_hits = sum(sample.count(w) for w in (" the ", " and ", " of ", " to ", " in ", " that ", " for ", " with "))
+
+    if es_hits > en_hits and es_hits >= 6:
+        return "es"
+    return "en"
+
+
 def fetch_raw_html(url: str, timeout: float = 20.0) -> Tuple[str, str]:
     """
-    Descarga el contenido HTML de la URL asegurando la codificación correcta
-    (especialmente para webs clásicas en ISO-8859-1 o Windows-1252).
-    Retorna (html_text, final_url).
+    Downloads raw HTML from the given URL while ensuring proper character encoding
+    (especially for legacy pages using ISO-8859-1 or Windows-1252).
+    Returns (html_text, final_url).
     """
-    # Intentar primero con trafilatura
     downloaded = trafilatura.fetch_url(url)
     if downloaded:
         return downloaded, url
@@ -37,7 +63,7 @@ def fetch_raw_html(url: str, timeout: float = 20.0) -> Tuple[str, str]:
         resp = client.get(url)
         resp.raise_for_status()
 
-        # Detección inteligente de codificación si no es UTF-8 explícito
+        # Smart charset fallback if server omits explicit UTF-8 or misreports encoding
         if not resp.encoding or resp.encoding.lower() == "utf-8":
             soup_pre = BeautifulSoup(resp.content[:4000], "html.parser")
             meta_charset = soup_pre.find("meta", charset=True)
@@ -53,9 +79,9 @@ def fetch_raw_html(url: str, timeout: float = 20.0) -> Tuple[str, str]:
 
 def pre_clean_html(html_str: str) -> str:
     """
-    Elimina bloques de redes sociales, botones de compartir, anuncios y banners.
-    Garantiza que el documento tenga un contenedor semántico <article>
-    para evitar que trafilatura active 'recover_wild_text' (que descarta h1-h6).
+    Strips social media blocks, share buttons, ads, and newsletter banners.
+    Ensures the document is wrapped in a semantic <article> container so
+    Trafilatura does not fall back to 'recover_wild_text' (which drops h1-h6).
     """
     if not html_str:
         return ""
@@ -65,21 +91,24 @@ def pre_clean_html(html_str: str) -> str:
         r"share|social|tweet|twitter|facebook|whatsapp|sharing|sharebox|"
         r"post-share|share-bar|share-buttons|social-icons|newsletter|subscribe|"
         r"author-social|reaction-buttons|comments|disqus|related-posts",
-        re.IGNORECASE
+        re.IGNORECASE,
     )
 
     for tag in soup.find_all(attrs={"class": social_patterns}):
         tag.decompose()
     for tag in soup.find_all(attrs={"id": social_patterns}):
         tag.decompose()
-    for a in soup.find_all("a", href=re.compile(
-        r"twitter\.com/intent/tweet|facebook\.com/sharer|linkedin\.com/share|"
-        r"pinterest\.com/pin|api\.whatsapp\.com|t\.me/share|mailto:\?subject",
-        re.I
-    )):
+    for a in soup.find_all(
+        "a",
+        href=re.compile(
+            r"twitter\.com/intent/tweet|facebook\.com/sharer|linkedin\.com/share|"
+            r"pinterest\.com/pin|api\.whatsapp\.com|t\.me/share|mailto:\?subject",
+            re.I,
+        ),
+    ):
         a.decompose()
 
-    # Si la web no tiene <article> ni <main>, envolver el body para preservar encabezados
+    # Wrap content in <article> if page lacks semantic landmarks to preserve headings
     if not soup.find(["article", "main"]):
         body = soup.find("body")
         if body:
@@ -94,13 +123,17 @@ def pre_clean_html(html_str: str) -> str:
     return str(soup)
 
 
-def post_clean_extracted_soup(soup: BeautifulSoup):
+def post_clean_extracted_soup(soup: BeautifulSoup) -> None:
     """
-    Limpia textos residuales de compartir o suscripciones que hayan escapado a trafilatura.
+    Removes unsafe tags and residual share/subscribe prompts from extracted HTML.
     """
+    for tag in soup.find_all(["script", "style", "iframe", "noscript", "object", "embed"]):
+        tag.decompose()
+
     share_text_pattern = re.compile(
-        r"\b(Share\s+Tweet|Tweet\s+Share|Share\s+on\s+Twitter|Compartir\s+en\s+Twitter|Compartir\s+Tweet)\b",
-        re.IGNORECASE
+        r"\b(Share\s+Tweet|Tweet\s+Share|Share\s+on\s+Twitter|Share\s+on\s+Facebook|"
+        r"Compartir\s+en\s+Twitter|Compartir\s+Tweet)\b",
+        re.IGNORECASE,
     )
     for text_node in list(soup.find_all(string=True)):
         if share_text_pattern.search(text_node):
@@ -108,41 +141,46 @@ def post_clean_extracted_soup(soup: BeautifulSoup):
             text_node.replace_with(new_text)
 
 
-def clean_and_normalize_headings(soup: BeautifulSoup, doc_title: str = "", doc_author: str = ""):
+def clean_and_normalize_headings(soup: BeautifulSoup, doc_title: str = "", doc_author: str = "") -> None:
     """
-    Normaliza y jerarquiza los títulos y subtítulos del contenido:
-    1. Promueve párrafos en negrita con formato de título (<p><b>...</b></p>) a <h4> reales.
-    2. Elimina títulos iniciales duplicados que repiten de forma idéntica el título o autor.
-    3. Fusiona encabezados adyacentes de numeración (ej. <h4>1.</h4> + <h4>TITULO</h4> -> <h4>1. TITULO</h4>).
+    Normalizes heading hierarchy inside extracted HTML:
+    1. Promotes short full-bold paragraphs (<p><b>...</b></p>) into <h4> headings.
+    2. Removes leading duplicate headings identical to document title or author.
+    3. Merges split numbering headings (e.g., <h4>1.</h4> + <h4>TITLE</h4> -> <h4>1. TITLE</h4>).
     """
-    # 1. Promover párrafos breves que son 100% negrita
+    # 1. Promote standalone bold paragraphs that act as subheadings
     for p in list(soup.find_all("p")):
         bold_child = p.find(["b", "strong"])
         if bold_child and bold_child.parent == p:
             b_text = bold_child.get_text().strip()
             p_text = p.get_text().strip()
             if b_text == p_text and 2 <= len(b_text) <= 120:
-                is_num_title = bool(re.match(
-                    r"^(\d+\.?|[IVXLCDM]+\.?|Cap[íi]tulo\s+\w+|Secci[óo]n\s+\w+|Parte\s+\w+).*$",
-                    b_text, re.I
-                ))
+                is_num_title = bool(
+                    re.match(
+                        r"^(\d+\.?|[IVXLCDM]+\.?|Chapter\s+\w+|Section\s+\w+|Part\s+\w+|"
+                        r"Cap[íi]tulo\s+\w+|Secci[óo]n\s+\w+|Parte\s+\w+).*$",
+                        b_text,
+                        re.I,
+                    )
+                )
                 if is_num_title or not b_text.endswith("."):
                     h = soup.new_tag("h4")
                     h.string = b_text
                     p.replace_with(h)
 
-    # 2. Desduplicar encabezados iniciales que repitan el título o autor general
+    # 2. Deduplicate leading headings matching main title or author
     norm_title = re.sub(r"\W+", " ", doc_title.lower()).strip() if doc_title else ""
     norm_author = re.sub(r"\W+", " ", doc_author.lower()).strip() if doc_author else ""
 
     leading_headings = list(soup.find_all(["h1", "h2", "h3"]))[:3]
     for h in leading_headings:
         h_text = re.sub(r"\W+", " ", h.get_text().lower()).strip()
-        if (norm_title and (h_text == norm_title or (len(norm_title) > 8 and norm_title in h_text))) or \
-           (norm_author and (h_text == norm_author or (len(norm_author) > 6 and norm_author in h_text))):
+        if (norm_title and (h_text == norm_title or (len(norm_title) > 8 and norm_title in h_text))) or (
+            norm_author and (h_text == norm_author or (len(norm_author) > 6 and norm_author in h_text))
+        ):
             h.decompose()
 
-    # 3. Fusionar encabezados adyacentes de numeración / sección
+    # 3. Merge adjacent numbering/section headings
     headings = list(soup.find_all(["h1", "h2", "h3", "h4", "h5", "h6"]))
     for i in range(len(headings) - 1):
         h1 = headings[i]
@@ -173,8 +211,11 @@ def clean_and_normalize_headings(soup: BeautifulSoup, doc_title: str = "", doc_a
                 h2.string = f"{num} {t2}"
                 h1.decompose()
             elif h1.name == h2.name and re.match(
-                r"^(PRIMERA|SEGUNDA|TERCERA|CUARTA|QUINTA|SEXTA|S[ÉE]PTIMA|OCTAVA|NOVENA|D[ÉE]CIMA|PARTE\s+\w+|CAP[ÍI]TULO\s+\w+).*$",
-                t1, re.I
+                r"^(FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH|NINTH|TENTH|"
+                r"PART\s+\w+|CHAPTER\s+\w+|PRIMERA|SEGUNDA|TERCERA|CUARTA|QUINTA|SEXTA|"
+                r"S[ÉE]PTIMA|OCTAVA|NOVENA|D[ÉE]CIMA|PARTE\s+\w+|CAP[ÍI]TULO\s+\w+).*$",
+                t1,
+                re.I,
             ):
                 separator = ": " if not t1.endswith(":") else " "
                 h2.string = f"{t1}{separator}{t2}"
@@ -183,15 +224,14 @@ def clean_and_normalize_headings(soup: BeautifulSoup, doc_title: str = "", doc_a
 
 def process_and_extract_images(soup: BeautifulSoup, base_url: str, max_width: int = 1600) -> List[Dict[str, Any]]:
     """
-    Descarga y optimiza las imágenes referenciadas en el HTML para empaquetarlas en el EPUB.
-    Convierte formatos no estándares (como WebP o TIFF) a JPEG/PNG para compatibilidad con Kindle.
-    Actualiza el atributo src en el soup a la ruta relativa interna 'images/img_XXX.ext'.
-    Retorna la lista de diccionarios con metadatos y bytes de cada imagen.
+    Downloads and optimizes referenced HTML images for packaging inside EPUB.
+    Converts unsupported formats (e.g., WebP, TIFF) to JPEG or PNG for Kindle compatibility.
+    Rewrites each <img> src to the internal relative path 'images/img_XXX.ext'.
+    Returns metadata and encoded image bytes for each valid image.
     """
     images_list = []
     headers = {"User-Agent": DEFAULT_USER_AGENT, "Referer": base_url}
 
-    # Procesar <picture> dejando solo el <img>
     for pic in soup.find_all("picture"):
         for src in pic.find_all("source"):
             src.decompose()
@@ -210,16 +250,14 @@ def process_and_extract_images(soup: BeautifulSoup, base_url: str, max_width: in
                 img.decompose()
                 continue
 
-            # Evitar SVG decorativos diminutos o tracking pixels
+            # Skip tiny decorative SVGs or tracking pixels
             if "data:image/svg" in raw_src and "pixel" in raw_src:
                 img.decompose()
                 continue
 
             try:
                 if raw_src.startswith("data:image/"):
-                    # Procesar Data URI existente
-                    header, data = raw_src.split(",", 1)
-                    import base64
+                    _header, data = raw_src.split(",", 1)
                     img_bytes = base64.b64decode(data)
                 else:
                     abs_url = urljoin(base_url, raw_src)
@@ -229,32 +267,25 @@ def process_and_extract_images(soup: BeautifulSoup, base_url: str, max_width: in
                         continue
                     img_bytes = resp.content
 
-                # Verificar y optimizar con Pillow
                 pil_img = Image.open(io.BytesIO(img_bytes))
                 orig_format = pil_img.format or "JPEG"
 
-                # Descartar iconos extremadamente pequeños (ej. avatars o badges < 20x20)
+                # Discard tiny UI icons or avatars (< 30x30 px)
                 if pil_img.width < 30 and pil_img.height < 30:
                     img.decompose()
                     continue
 
-                # Redimensionar si es excesivamente grande para un e-reader
+                # Downscale oversized images for e-reader memory efficiency
                 if pil_img.width > max_width:
                     ratio = max_width / float(pil_img.width)
                     new_height = int(float(pil_img.height) * ratio)
                     pil_img = pil_img.resize((max_width, new_height), Image.Resampling.LANCZOS)
-
-                # Convertir formatos raros o WebP a JPEG o PNG
-                output_ext = "jpg"
-                media_type = "image/jpeg"
-                save_format = "JPEG"
 
                 if orig_format.upper() in ("PNG", "GIF"):
                     output_ext = orig_format.lower()
                     media_type = f"image/{orig_format.lower()}"
                     save_format = orig_format.upper()
                 else:
-                    # Si tiene canal alfa (RGBA) y convertimos a JPEG, quitar alfa
                     if pil_img.mode in ("RGBA", "LA", "P"):
                         pil_img = pil_img.convert("RGB")
                     save_format = "JPEG"
@@ -269,35 +300,33 @@ def process_and_extract_images(soup: BeautifulSoup, base_url: str, max_width: in
                 filename = f"{item_id}.{output_ext}"
                 epub_rel_path = f"images/{filename}"
 
-                # Actualizar tag en el soup
                 img["src"] = epub_rel_path
 
-                # Limpiar atributos superfluos
                 for attr in ["srcset", "data-src", "data-original", "data-lazy-src", "loading", "sizes", "style"]:
                     if img.has_attr(attr):
                         del img[attr]
 
-                images_list.append({
-                    "id": item_id,
-                    "filename": filename,
-                    "rel_path": epub_rel_path,
-                    "content": final_bytes,
-                    "media_type": media_type
-                })
+                images_list.append(
+                    {
+                        "id": item_id,
+                        "filename": filename,
+                        "rel_path": epub_rel_path,
+                        "content": final_bytes,
+                        "media_type": media_type,
+                    }
+                )
                 img_counter += 1
 
             except Exception:
-                # Si falla la descarga o procesamiento, eliminar la imagen rota
                 img.decompose()
 
     return images_list
 
 
-def fetch_article_metadata(url: str) -> Dict[str, Any]:
+def extract_metadata_from_html(raw_html: str, final_url: str) -> Dict[str, Any]:
     """
-    Extrae rápidamente los metadatos de un artículo web para la vista previa editable.
+    Extracts article metadata (title, author, date, sitename, language) from downloaded HTML.
     """
-    raw_html, final_url = fetch_raw_html(url, timeout=12.0)
     meta = trafilatura.extract_metadata(raw_html)
 
     title = meta.title if meta and meta.title else ""
@@ -307,7 +336,7 @@ def fetch_article_metadata(url: str) -> Dict[str, Any]:
 
     soup = BeautifulSoup(raw_html, "html.parser")
 
-    # Heurística para títulos clásicos tipo "Autor (Año): Título"
+    # Heuristic for classic archive titles like "Author (Year): Title"
     if not title or not author:
         raw_title_tag = soup.title.string if soup.title else ""
         if raw_title_tag:
@@ -320,71 +349,84 @@ def fetch_article_metadata(url: str) -> Dict[str, Any]:
 
     if not title:
         h1 = soup.find("h1")
-        title = h1.get_text(strip=True) if h1 else (soup.title.string.strip() if soup.title else "")
+        title = h1.get_text(strip=True) if h1 else (soup.title.string.strip() if soup.title and soup.title.string else "")
 
     if not author:
         meta_author = soup.find("meta", attrs={"name": re.compile(r"author", re.I)})
         if meta_author and meta_author.get("content"):
             author = meta_author["content"].strip()
 
+    language = detect_document_language(soup.get_text(" ", strip=True), soup=soup)
+
     return {
-        "title": title.strip() if title else "Artículo Web",
-        "author": author.strip() if author and author.lower() not in ("none", "null") else "Autor Desconocido",
+        "title": title.strip() if title else "Web Article",
+        "author": author.strip() if author and author.lower() not in ("none", "null") else "Unknown Author",
         "date": date.strip() if date else "",
         "sitename": sitename.strip() if sitename else urlparse(final_url).netloc,
-        "url": final_url
+        "url": final_url,
+        "language": language,
     }
+
+
+def fetch_article_metadata(url: str) -> Dict[str, Any]:
+    """
+    Fetches a web URL and returns extracted article metadata.
+    """
+    raw_html, final_url = fetch_raw_html(url, timeout=12.0)
+    return extract_metadata_from_html(raw_html, final_url)
 
 
 def extract_clean_article(url: str, include_images: bool = True) -> Dict[str, Any]:
     """
-    Procesa de manera completa el artículo web:
-    - Descarga con encoding seguro.
-    - Pre-limpieza y envoltura semántica.
-    - Extracción con Trafilatura (con fallback a BeautifulSoup).
-    - Normalización de títulos y subtítulos.
-    - Descarga y empaquetado de imágenes optimizadas para EPUB.
+    Full article extraction pipeline:
+    - Downloads raw HTML with charset auto-detection.
+    - Pre-cleans social clutter and enforces semantic wrapping.
+    - Extracts main content via Trafilatura (with BeautifulSoup fallback).
+    - Normalizes headings and strips unsafe elements.
+    - Downloads and optimizes local EPUB images.
     """
     raw_html, final_url = fetch_raw_html(url)
     cleaned_html = pre_clean_html(raw_html)
 
-    # Metadatos base
-    meta_info = fetch_article_metadata(url)
+    meta_info = extract_metadata_from_html(raw_html, final_url)
     title = meta_info["title"]
     author = meta_info["author"]
     date = meta_info["date"]
     sitename = meta_info["sitename"]
+    language = meta_info["language"]
 
-    # Contar encabezados en original
     raw_soup = BeautifulSoup(cleaned_html, "html.parser")
     raw_headings_count = len(raw_soup.find_all(["h1", "h2", "h3", "h4", "h5", "h6"]))
 
-    # Extracción de trafilatura
     extracted_html = trafilatura.extract(
         cleaned_html,
         output_format="html",
         include_formatting=True,
         include_images=include_images,
-        include_links=True
+        include_links=True,
     )
 
     ext_soup = BeautifulSoup(extracted_html or "", "html.parser")
     ext_headings_count = len(ext_soup.find_all(["h1", "h2", "h3", "h4", "h5", "h6"]))
 
-    # Fallback si trafilatura falló, el texto es ínfimo o eliminó encabezados presentes en el original
+    # Fallback if Trafilatura fails, extracts minimal content, or drops headings present in original
     if not extracted_html or len(extracted_html.strip()) < 120 or (raw_headings_count > 0 and ext_headings_count == 0):
         soup = BeautifulSoup(cleaned_html, "html.parser")
         for tag in soup(["script", "style", "nav", "footer", "aside", "header", "iframe", "noscript"]):
             tag.decompose()
 
-        article_node = soup.find("article") or soup.find("main") or soup.find(class_=re.compile(r"content|post|entry|article", re.I))
+        article_node = (
+            soup.find("article")
+            or soup.find("main")
+            or soup.find(class_=re.compile(r"content|post|entry|article", re.I))
+        )
         if article_node:
             extracted_html = str(article_node)
         else:
             body = soup.find("body")
             extracted_html = str(body) if body else str(soup)
 
-    soup = BeautifulSoup(extracted_html or "<p>No se pudo extraer contenido.</p>", "html.parser")
+    soup = BeautifulSoup(extracted_html or "<p>No content could be extracted.</p>", "html.parser")
     post_clean_extracted_soup(soup)
     clean_and_normalize_headings(soup, doc_title=title, doc_author=author)
 
@@ -401,6 +443,7 @@ def extract_clean_article(url: str, include_images: bool = True) -> Dict[str, An
         "date": date,
         "sitename": sitename,
         "url": final_url,
+        "language": language,
         "html_body": str(soup),
-        "images": images
+        "images": images,
     }
